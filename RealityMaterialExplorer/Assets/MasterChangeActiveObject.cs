@@ -57,6 +57,15 @@ public class MasterChangeActiveObject : MonoBehaviour// : ChangeActiveObject
 		CAOs[activeIndex].changeMERLMaterial(i);
 	}
 	
+	//METALS
+	public void metalnext(){
+			CAOs[activeIndex].metalnext();
+	}
+	
+	public void metalback(){ 
+		CAOs[activeIndex].metalback();
+	}
+	
 	
 
 	public void changeBRDF(int BRDF){

@@ -564,11 +564,11 @@ float mitsuba_G(float3 wi, float3 wo, float3 m, float alpha){
 	return mitsuba_smithG1(wi,m,alpha) * mitsuba_smithG1(wo,m,alpha);
 }
 
-float mitsuba_Fresnel(float cosThetaI, float eta){
+float mitsuba_Fresnel(float cosThetaI, float eta, float in_k=0.0f){
 	//return eta;
 	if(cosThetaI<0.0f){cosThetaI = abs(cosThetaI);}
 	//if(eta < 5.0f){return 0.0f;}
-	float k=0.0f;
+	float k = in_k; //float k=0.0f;
 	float cosThetaI2 = cosThetaI*cosThetaI;
     float sinThetaI2 = 1.0f-cosThetaI2;
     float sinThetaI4 = sinThetaI2*sinThetaI2;
@@ -592,12 +592,38 @@ float mitsuba_Fresnel(float cosThetaI, float eta){
 }
 
 
+float mitsuba_Complex_Fresnel(float cosThetaI, float eta, float k){
+	//return eta;
+	if(cosThetaI<0.0f){cosThetaI = abs(cosThetaI);}
+	//if(eta < 5.0f){return 0.0f;}
+	float cosThetaI2 = cosThetaI*cosThetaI;
+    float sinThetaI2 = 1.0f-cosThetaI2;
+    float sinThetaI4 = sinThetaI2*sinThetaI2;
+
+    float temp1 = eta*eta - k*k - sinThetaI2;
+    float a2pb2 = sqrt(temp1*temp1 + 4*k*k*eta*eta);
+    float a     = sqrt(0.5f * (a2pb2 + temp1));
+
+    float term1 = a2pb2 + cosThetaI2;
+    float term2 = 2.0f*a*cosThetaI;
+
+    float Rs2 = (term1 - term2) / (term1 + term2);
+
+    float term3 = a2pb2*cosThetaI2 + sinThetaI4;
+    float term4 = term2*sinThetaI2;
+
+    float Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
+
+    return 0.5f * (Rp2 + Rs2);
+	
+}
+
 
 /*For all versions*/
 
 float _F0;
 
-float _dr,_dg,_db,_sr,_sg,_sb,_RoughnessAlpha,_FresnelEta,_Anisotropic;
+float _dr,_dg,_db,_sr,_sg,_sb,_RoughnessAlpha,_FresnelEta,_FresnelK,_Anisotropic;
 
 float _mitsuba_dist_mode;
 
@@ -942,6 +968,7 @@ half4 BRDF4_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivi
     diffColor = half3(_dr,_dg,_db);
 	specColor = half3(_sr,_sg,_sb);
 	float eta = _FresnelEta;
+	float k = _FresnelK;
     float a = _RoughnessAlpha;
 	float d;
 	if(_mitsuba_dist_mode>0.0){d = CTTermMitsuba(local_half_dir,a);}
@@ -949,7 +976,7 @@ half4 BRDF4_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivi
 	//float g_smaller = min(nv,nl);
 	//float g = min(1.0f,2.0*nh*g_smaller/vh);
 	float g = mitsuba_G_Beckmann(local_light_dir,local_view_dir,local_half_dir,a);
-	float f = mitsuba_Fresnel(vh,eta);
+	float f = mitsuba_Fresnel(vh,eta,k);
     float specularTerm = d*g*f;//a2 / (max(0.1f, lh*lh) * (roughness + 0.5f) * (d * d) * 4);
 
 
@@ -2203,6 +2230,7 @@ half4 BRDF5_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivi
 	float3 floatspeccolor = float3(_sr,_sg,_sb);
 	//return float4(floatspeccolor,1);
 	float eta = _FresnelEta;
+	float k = _FresnelK;
 	float d;
 	float g;
 	float f;
@@ -2218,12 +2246,12 @@ half4 BRDF5_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivi
 		else{g = mitsuba_G(local_light_dir,local_view_dir,local_half_dir,a);}
 		//float g_smaller = min(nv,nl);
 		//float g = min(1.0f,2.0*nh*g_smaller/vh);
-		f = mitsuba_Fresnel(vh,eta);
+		f = mitsuba_Fresnel(vh,eta,k);
 		//float f = FresnelTerm((eta-1.0f)*(eta-1.0f)/((eta+1.0f)*(eta+1.0f)),vh);
 		
 		monoSpecTerm = d*g*f/(4.0h*nv*nl);//a2 / (max(0.1f, lh*lh) * (roughness + 0.5f) * (d * d) * 4);
 		if(nv<=0.0f || nl<=0.0f){monoSpecTerm = 0.0f;} 
-		float3 compF0 = mitsuba_Fresnel(1.0f,eta)*specColor;
+		float3 compF0 = mitsuba_Fresnel(1.0f,eta,k)*specColor;
 		if(_use_SMS>0.0){
 			float mse = computeMSE(nv, a);
 			monoSpecTerm = monoSpecTerm+monoSpecTerm*mse*compF0;//*nl;//maybe add cosine of theta
@@ -2783,6 +2811,7 @@ half4 BRDF_ACT_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflect
 diffColor = half3(_dr,_dg,_db);
 	specColor = half3(_sr,_sg,_sb);
 	float eta = _FresnelEta;
+	float k = _FresnelK;
     float ax = _RoughnessAlpha;
 	float ay = _RoughnessAlpha*_Anisotropic;
 	float d;
@@ -2790,7 +2819,7 @@ diffColor = half3(_dr,_dg,_db);
 	//float g_smaller = min(nv,nl);
 	//float g = min(1.0f,2.0*nh*g_smaller/vh);
 	float g = mitsuba_G_Beckmann(local_light_dir,local_view_dir,local_half_dir,ax);
-	float f = mitsuba_Fresnel(vh,eta);
+	float f = mitsuba_Fresnel(vh,eta,k);
     float specularTerm = d*g*f;//a2 / (max(0.1f, lh*lh) * (roughness + 0.5f) * (d * d) * 4);
 
 
@@ -2920,6 +2949,7 @@ half4 BRDF_AGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflec
 	float3 floatspeccolor = float3(_sr,_sg,_sb);
 	//return float4(floatspeccolor,1);
 	float eta = _FresnelEta;
+	float k = _FresnelK;
 	float d;
 	float g;
 	float f;
@@ -2934,11 +2964,11 @@ half4 BRDF_AGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflec
 		if(_GGXVG>0.0f){g = GGXVG_G(local_light_dir,local_view_dir,local_half_dir);}
 		else{g = mitsuba_G(local_light_dir,local_view_dir,local_half_dir,a);}
 
-		f = mitsuba_Fresnel(vh,eta);
+		f = mitsuba_Fresnel(vh,eta,k);
 		
 		monoSpecTerm = d*g*f/(4.0h*nv*nl);//a2 / (max(0.1f, lh*lh) * (roughness + 0.5f) * (d * d) * 4);
 		if(nv<=0.0f || nl<=0.0f){monoSpecTerm = 0.0f;} 
-		float3 compF0 = mitsuba_Fresnel(1.0f,eta)*specColor;
+		float3 compF0 = mitsuba_Fresnel(1.0f,eta,k)*specColor;
 		specularTerm = specColor*monoSpecTerm;
 	
 	
@@ -2971,34 +3001,7 @@ half4 BRDF_AGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflec
     return half4(color,1);
 }
 
-
 float _er,_eg,_eb,_kr,_kg,_kb;
-
-float mitsuba_Complex_Fresnel(float cosThetaI, float eta, float k){
-	//return eta;
-	if(cosThetaI<0.0f){cosThetaI = abs(cosThetaI);}
-	//if(eta < 5.0f){return 0.0f;}
-	float cosThetaI2 = cosThetaI*cosThetaI;
-    float sinThetaI2 = 1.0f-cosThetaI2;
-    float sinThetaI4 = sinThetaI2*sinThetaI2;
-
-    float temp1 = eta*eta - k*k - sinThetaI2;
-    float a2pb2 = sqrt(temp1*temp1 + 4*k*k*eta*eta);
-    float a     = sqrt(0.5f * (a2pb2 + temp1));
-
-    float term1 = a2pb2 + cosThetaI2;
-    float term2 = 2.0f*a*cosThetaI;
-
-    float Rs2 = (term1 - term2) / (term1 + term2);
-
-    float term3 = a2pb2*cosThetaI2 + sinThetaI4;
-    float term4 = term2*sinThetaI2;
-
-    float Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
-
-    return 0.5f * (Rp2 + Rs2);
-	
-}
 
 half4 BRDF_AMGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivity, half smoothness,
     float3 normal, float3 viewDir,
@@ -3098,12 +3101,13 @@ half4 BRDF_AMGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusRefle
 	float3 floatspeccolor = float3(_sr,_sg,_sb);
 	//return float4(floatspeccolor,1);
 	float eta = _FresnelEta;
-	float er = _dr*4+1;
-	float eg = _dg*4+1;
-	float eb = _db*4+1;
-	float kr = _sr*5;
-	float kg = _sg*5;
-	float kb = _sb*5;
+	float k = _FresnelK;
+	float er = _er;
+	float eg = _eg;
+	float eb = _eb;
+	float kr = _kr;
+	float kg = _kg;
+	float kb = _kb;
 	float d;
 	float g;
 	float f;
@@ -3126,8 +3130,8 @@ half4 BRDF_AMGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusRefle
 		
 		monoSpecTerm = d*g/(4.0h*nv*nl);//a2 / (max(0.1f, lh*lh) * (roughness + 0.5f) * (d * d) * 4);
 		if(nv<=0.0f || nl<=0.0f){monoSpecTerm = 0.0f;} 
-		//float3 compF0 = mitsuba_Fresnel(1.0f,eta,k)*specColor;
-		specularTerm = f3*monoSpecTerm;
+		float3 compF0 = mitsuba_Fresnel(1.0f,eta,k)*specColor;
+		specularTerm = specColor*f3*monoSpecTerm;
 	
 	
 	
@@ -3151,8 +3155,8 @@ half4 BRDF_AMGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusRefle
 #if defined(_SPECULARHIGHLIGHTS_OFF)
     specularTerm = float3(0,0,0);
 #endif
-	if(_plot_mode>0.0f){return float4(pow((specularTerm),1),1);}
-	half3 color =   (specularTerm) * light.color * nl;
+	if(_plot_mode>0.0f){return float4(pow(((1.0/3.14159)*diffColor + /*(1.0/3.14159)*/ specularTerm),1),1);}
+	half3 color =   ((1.0/3.14159)*diffColor + /*(1.0/3.14159)*/ specularTerm) * light.color * nl;
                     //+ gi.diffuse * diffColor
                     //+ surfaceReduction * gi.specular * specColor * f;
 	//if(_show_info_shader){color = color + INFORMATIVE_SHADER(diffColor, specColor, oneMinusReflectivity, smoothness, normal, viewDir, light, gi, F0, tex_xy);}
@@ -3160,10 +3164,14 @@ half4 BRDF_AMGGX_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusRefle
 }
 
 
+
 half4 DEBUGBRDF_Unity_PBS (half3 diffColor, half3 specColor, half oneMinusReflectivity, half smoothness,
     float3 normal, float3 viewDir,
     UnityLight light, UnityIndirect gi, half F0, float2 tex_xy = float2(0,0))
 { return float4(1,1,1,1);}
+
+
+
 
 
 
