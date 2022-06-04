@@ -34,6 +34,10 @@ public class ChangeActiveObject : MonoBehaviour
 	private GameObject activeobj;
     private int activeindex;
 	
+	public GameObject DifSpecText;
+	public GameObject EtaKText;
+	public GameObject MetalSelectText;
+	
 	public Text prevtext;
 	public Text curtext;
 	public Text nexttext;
@@ -941,6 +945,18 @@ private string[] metalnames = new string[] {
 		else MSText.transform.localScale = new Vector3(0.0f, 1.0f, 1.0f);
 	}
 	
+	public void showOrHideMetalLabels(){
+		if(activeBRDFnumber==7)
+			{DifSpecText.transform.localScale = new Vector3(0.0f, 1.0f, 1.0f);
+			EtaKText.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
+			MetalSelectText.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);}
+		else 
+			{EtaKText.transform.localScale = new Vector3(0.0f, 1.0f, 1.0f);
+			DifSpecText.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
+			MetalSelectText.transform.localScale = new Vector3(0.0f, 1.0f, 1.0f);}
+		
+	}
+	
 	public string getMERLname(int i){
 		return matnames[i];
 	}
@@ -1053,6 +1069,7 @@ private string[] metalnames = new string[] {
 		if(BRDF==0){MERLButtons.selectButton(0);}
 		else{MERLButtons.selectButton(1);}
 		showOrHideMSText();
+		showOrHideMetalLabels();
 		return;
 	}
 
@@ -1203,6 +1220,8 @@ private string[] metalnames = new string[] {
 		sbslider.value = (float)BRDFMaterials[activeBRDFnumber].GetFloat("_sb");
 		aslider.value = (float)BRDFMaterials[activeBRDFnumber].GetFloat("_RoughnessAlpha");
 		etaslider.value = (float)BRDFMaterials[activeBRDFnumber].GetFloat("_FresnelEta");
+		//change names if metal
+		
 	}
 	
 	public void updateMatCanvas(){
@@ -1258,6 +1277,7 @@ private string[] metalnames = new string[] {
 		if(activeBRDFnumber==3){ModelsButtons.selectButton(2);}
 		
 		showOrHideMSText();
+		showOrHideMetalLabels();
 	}
 	
 	
